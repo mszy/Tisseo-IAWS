@@ -23,6 +23,24 @@
 			</g:if>
 			<ol class="property-list place">
 			
+				<g:if test="${placeInstance?.name}">
+				<li class="fieldcontain">
+					<span id="name-label" class="property-label"><g:message code="place.name.label" default="Name" /></span>
+					
+						<span class="property-value" aria-labelledby="name-label"><g:fieldValue bean="${placeInstance}" field="name"/></span>
+					
+				</li>
+				</g:if>
+			
+				<g:if test="${placeInstance?.shortName}">
+				<li class="fieldcontain">
+					<span id="shortName-label" class="property-label"><g:message code="place.shortName.label" default="Short Name" /></span>
+					
+						<span class="property-value" aria-labelledby="shortName-label"><g:fieldValue bean="${placeInstance}" field="shortName"/></span>
+					
+				</li>
+				</g:if>
+			
 			</ol>
 			<g:form>
 				<fieldset class="buttons">

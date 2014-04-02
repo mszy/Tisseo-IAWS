@@ -1,9 +1,11 @@
 package tisseo
 
+import groovy.json.JsonSlurper
+
 class Place {
 	String name
 	String shortName
-	String id
+	
 	
     static constraints = {
     }
