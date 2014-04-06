@@ -3,6 +3,7 @@ package tisseo
 import java.beans.MetaData;
 import java.text.SimpleDateFormat
 
+import grails.artefact.ApiDelegate;
 import groovy.json.JsonSlurper;
 
 import org.springframework.dao.DataIntegrityViolationException
@@ -18,18 +19,45 @@ class LineController {
     }
 
     def list(Integer max) {
-		if( MetaDataAPI.instance.expirationDateLines == null || MetaDataAPI.instance.expirationDateLines < new Date() ) {
+		def alreadyRetrieved = ExpirationDates.findByApiName( "linesList" ) == null
+		if( alreadyRetrieved || ExpirationDates.findByApiName( "linesList" ).expirationDate < new Date() ) {
 			JsonSlurper json =  new JsonSlurper()
 			def rawText = new URL( "http://pt.data.tisseo.fr/linesList?format=json&key=a03561f2fd10641d96fb8188d209414d8" ).text
 			def jsonObj = json.parseText( rawText )
 			
-			MetaDataAPI.instance.expirationDateLines = new SimpleDateFormat("yyyy-MM-dd h:m").parse( jsonObj.expirationDate )
+			def extractedDate = new SimpleDateFormat("yyyy-MM-dd h:m").parse( jsonObj.expirationDate )
+			if( alreadyRetrieved ) {
+				def newDate = ExpirationDates.findByApiName( "linesList" )
+				newDate.expirationDate = extractedDate
+				newDate.save()
+			} else {
+				new ExpirationDates( apiName: "linesList", expirationDate = extractedDate ).save()
+			}
 		
 			def extractedLines = jsonObj.lines.line
 			extractedLines.each {
-				//println it.name + " --/-- " + it.shortName + " --/-- " + it.id
-				new Line( name: it.name, shortName: it.shortName, id: it.id, likesCount: 0, dislikesCount: 0 ).save()
+				def line = Line.findByLineId( it.id )
+				println line
+				println " /// " + it.name + " --/-- " + it.shortName + " --/-- " + it.id + " --/-- " + it.transportMode?.name
+				if( line == null ) {
+					line = new Line( name: it.name,
+						  	  		 shortName: it.shortName,
+									 lineId: it.id,
+									 transportMode: it.transportMode?.name,
+									 likesCount: 0,
+									 dislikesCount: 0 )
+					println "J'ajoute la nouvelle ligne ${line.shortName}"
+				} else {
+					line.name = it.name
+					line.shortName = it.shortName
+					line.lineId = it.lineId
+					line.transportMode = it.transportMode?.name
+					line.likesCount = 2
+					line.dislikesCount = 1
+					println "Je modifie la ligne ${line.shortName}"
 				}
+				line.save()
+			}
 		} else {
 			println "No need te retrieve datas"
 		}
@@ -49,8 +77,8 @@ class LineController {
             return
         }
 
-        flash.message = message(code: 'default.created.message', args: [message(code: 'line.label', default: 'Line'), lineInstance.id])
-        redirect(action: "show", id: lineInstance.id)
+        flash.message = message(code: 'default.created.message', args: [message(code: 'line.label', default: 'Line'), lineInstance.lineId])
+        redirect(action: "show", id: lineInstance.lineId)
     }
 
     def show(Long id) {
@@ -100,8 +128,8 @@ class LineController {
             return
         }
 
-        flash.message = message(code: 'default.updated.message', args: [message(code: 'line.label', default: 'Line'), lineInstance.id])
-        redirect(action: "show", id: lineInstance.id)
+        flash.message = message(code: 'default.updated.message', args: [message(code: 'line.label', default: 'Line'), lineInstance.lineId])
+        redirect(action: "show", id: lineInstance.lineId)
     }
 
     def delete(Long id) {
