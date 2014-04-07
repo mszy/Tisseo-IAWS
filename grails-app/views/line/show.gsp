@@ -46,7 +46,8 @@
 				<li class="fieldcontain">
 					<span id="likes-label" class="property-label"><g:message code="line.likes.label" default="Likes" /></span>
 					
-						<span class="property-value" aria-labelledby="likes-label">${lineInstance.likesCount >= lineInstance.dislikesCount ? "+" : "-"}${Math.abs(lineInstance.likesCount - lineInstance.dislikesCount)}</span>
+						<span class="property-value">${lineInstance.likesCount >= lineInstance.dislikesCount ? "+" : "-"}${Math.abs(lineInstance.likesCount - lineInstance.dislikesCount)}
+						(Total des votes : ${lineInstance.likesCount + lineInstance.dislikesCount})</span>
 					
 				</li>
 			

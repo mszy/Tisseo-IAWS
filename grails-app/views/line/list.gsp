@@ -33,14 +33,17 @@
 				</thead> -->
 				<tbody>
 					<tr>
-						<td><b>Métro</b></td>
+						<td><b>Bus</b></td>
 					</tr>
-				<g:each in="${Line.findAllByTransportMode( "métro" )}" status="i" var="lineInstance">
+				<g:each in="${Line.findAllByTransportMode( "bus" )}" status="i" var="lineInstance">
 					<tr class="${(i % 2) == 0 ? 'even' : 'odd'}">
 					
 						<td><g:link action="show" id="${lineInstance.id}">${fieldValue(bean: lineInstance, field: "name")}</g:link></td>
 					
 						<td>${fieldValue(bean: lineInstance, field: "shortName")}</td>
+						
+						<td>${lineInstance.likesCount >= lineInstance.dislikesCount ? "+" : "-"}${Math.abs(lineInstance.likesCount - lineInstance.dislikesCount)}
+						(${lineInstance.likesCount + lineInstance.dislikesCount})</td>
 					
 					</tr>
 				</g:each>

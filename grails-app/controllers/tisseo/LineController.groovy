@@ -19,8 +19,8 @@ class LineController {
     }
 
     def list(Integer max) {
-		def alreadyRetrieved = ExpirationDates.findByApiName( "linesList" ) == null
-		if( alreadyRetrieved || ExpirationDates.findByApiName( "linesList" ).expirationDate < new Date() ) {
+		def alreadyRetrieved = ExpirationDates.findByApiName( "linesList" ) != null
+		if( !alreadyRetrieved || ExpirationDates.findByApiName( "linesList" ).expirationDate < new Date() ) {
 			JsonSlurper json =  new JsonSlurper()
 			def rawText = new URL( "http://pt.data.tisseo.fr/linesList?format=json&key=a03561f2fd10641d96fb8188d209414d8" ).text
 			def jsonObj = json.parseText( rawText )
@@ -31,14 +31,14 @@ class LineController {
 				newDate.expirationDate = extractedDate
 				newDate.save()
 			} else {
-				new ExpirationDates( apiName: "linesList", expirationDate = extractedDate ).save()
+				new ExpirationDates( apiName: "linesList", expirationDate: extractedDate ).save()
 			}
 		
 			def extractedLines = jsonObj.lines.line
 			extractedLines.each {
 				def line = Line.findByLineId( it.id )
 				println line
-				println " /// " + it.name + " --/-- " + it.shortName + " --/-- " + it.id + " --/-- " + it.transportMode?.name
+				println " /// " + it.shortName + " --/-- " + it.transportMode?.name + " --/-- " + line?.likesCount + " --/-- " + line?.dislikesCount  
 				if( line == null ) {
 					line = new Line( name: it.name,
 						  	  		 shortName: it.shortName,
@@ -52,8 +52,6 @@ class LineController {
 					line.shortName = it.shortName
 					line.lineId = it.lineId
 					line.transportMode = it.transportMode?.name
-					line.likesCount = 2
-					line.dislikesCount = 1
 					println "Je modifie la ligne ${line.shortName}"
 				}
 				line.save()
@@ -150,4 +148,18 @@ class LineController {
             redirect(action: "show", id: id)
         }
     }
+	
+	def like(Long id) {
+		def lineToUpdate = Line.get(id)
+		lineToUpdate.likesCount++
+		lineToUpdate.save()
+		redirect(action: "list", id: id)
+	}
+	
+	def dislike(Long id) {
+		def lineToUpdate = Line.get(id)
+		lineToUpdate.dislikesCount++
+		lineToUpdate.save()
+		redirect(action: "list", id: id)
+	}
 }
