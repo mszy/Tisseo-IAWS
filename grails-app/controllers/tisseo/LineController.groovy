@@ -1,64 +1,102 @@
 package tisseo
 
-import java.beans.MetaData;
+import groovy.json.JsonSlurper
+
 import java.text.SimpleDateFormat
 
-import grails.artefact.ApiDelegate;
-import groovy.json.JsonSlurper;
-
 import org.springframework.dao.DataIntegrityViolationException
-
-import com.sun.org.apache.xml.internal.serialize.LineSeparator;
 
 class LineController {
 
     static allowedMethods = [save: "POST", update: "POST", delete: "POST"]
+	static apiKey = "a03561f2fd10641d96fb8188d209414d8"
+	static bbox = "1.461167%2C43.554955%2C1.482711%2C43.5738"
 
     def index() {
         redirect(action: "list", params: params)
     }
-
-    def list(Integer max) {
-		def alreadyRetrieved = ExpirationDates.findByApiName( "linesList" ) != null
-		if( !alreadyRetrieved || ExpirationDates.findByApiName( "linesList" ).expirationDate < new Date() ) {
-			JsonSlurper json =  new JsonSlurper()
-			def rawText = new URL( "http://pt.data.tisseo.fr/linesList?format=json&key=a03561f2fd10641d96fb8188d209414d8" ).text
-			def jsonObj = json.parseText( rawText )
+	
+	def retrieveJSON(String apiName, String parameters) {
+		//FIX getting line one by one fail because of the date	
+			JsonSlurper jsonSlurper =  new JsonSlurper()
+			def rawText = new URL( "http://pt.data.tisseo.fr/${apiName}?format=json" + ( parameters == "" ? "" : "&" ) + "${parameters}&key=${apiKey}" ).text
+			println "http://pt.data.tisseo.fr/${apiName}?format=json" + ( parameters == "" ? "" : "&" ) + "${parameters}&key=${apiKey}"
+			jsonSlurper.parseText( rawText )
+	}
+	
+	def updateStopAreasAndLineApi() {
+		def apiNameStopArea = "stopAreasList"
+		def json = null
+		def alreadyRetrieved = ExpirationDates.findByApiName( apiNameStopArea ) != null
+		if( !alreadyRetrieved || ExpirationDates.findByApiName( apiNameStopArea ).expirationDate < new Date() ) {
+		
+			json = retrieveJSON( apiNameStopArea, "displayLines=1&bbox=${bbox}" )
 			
-			def extractedDate = new SimpleDateFormat("yyyy-MM-dd h:m").parse( jsonObj.expirationDate )
+			def extractedDate = new SimpleDateFormat("yyyy-MM-dd h:m").parse( json.expirationDate )
 			if( alreadyRetrieved ) {
-				def newDate = ExpirationDates.findByApiName( "linesList" )
+				def newDate = ExpirationDates.findByApiName( apiNameStopArea )
 				newDate.expirationDate = extractedDate
 				newDate.save()
 			} else {
-				new ExpirationDates( apiName: "linesList", expirationDate: extractedDate ).save()
+				new ExpirationDates( apiName: apiNameStopArea, expirationDate: extractedDate ).save()
 			}
-		
-			def extractedLines = jsonObj.lines.line
-			extractedLines.each {
-				def line = Line.findByLineId( it.id )
-				println line
-				println " /// " + it.shortName + " --/-- " + it.transportMode?.name + " --/-- " + line?.likesCount + " --/-- " + line?.dislikesCount  
-				if( line == null ) {
-					line = new Line( name: it.name,
-						  	  		 shortName: it.shortName,
-									 lineId: it.id,
-									 transportMode: it.transportMode?.name,
-									 likesCount: 0,
-									 dislikesCount: 0 )
-					println "J'ajoute la nouvelle ligne ${line.shortName}"
-				} else {
-					line.name = it.name
-					line.shortName = it.shortName
-					line.lineId = it.lineId
-					line.transportMode = it.transportMode?.name
-					println "Je modifie la ligne ${line.shortName}"
-				}
-				line.save()
-			}
-		} else {
-			println "No need te retrieve datas"
 		}
+		
+		println "json = " + json
+		if ( json != null ) {
+			json = json.stopAreas.stopArea
+			json.each {
+				it.line.each {
+					def lineJson = retrieveJSON( "linesList", "lineId=${it.id}" )
+					println "lineJson = " + lineJson
+					if( lineJson != null ) {
+						lineJson = lineJson.lines.line[0]
+						def line = Line.findByLineId( it.id )
+						if( line == null ) {
+							line = new Line( name: lineJson.name,
+											 shortName: lineJson.shortName,
+											 lineId: lineJson.id,
+											 transportMode: lineJson.transportMode?.name,
+											 likesCount: 0,
+											 dislikesCount: 0 )
+	//						println "J'ajoute la nouvelle ligne ${line.shortName}"
+						} else {
+							line.name = lineJson.name
+							line.shortName = lineJson.shortName
+							line.lineId = lineJson.id
+							line.transportMode = lineJson.transportMode?.name
+	//						println "Je modifie la ligne ${line.shortName}"
+						}
+						line.save()
+					}
+				}
+				
+				def stopArea = StopArea.findByStopAreaId( it.id )
+				if( stopArea == null ) {
+					stopArea = new StopArea( name: it.name,
+										 	 stopAreaId: it.id)
+//						println "J'ajoute la nouvelle stopArea ${line.shortName}"
+				} else {
+					stopArea.name = it.name
+					stopArea.stopAreaId = it.id
+//						println "Je modifie la stopArea ${line.shortName}"
+				}
+				stopArea.save()
+			}
+		}
+	}
+	
+	def updateStopPointsApi() {
+		def json = retrieveJSON( "stopPointsList", "displayLines=1&bbox=${bbox}" )
+	}
+	
+	def updateApiInformationIfNecessary() {
+		updateStopAreasAndLineApi()
+		updateStopPointsApi()
+	}
+
+    def list(Integer max) {
+		updateApiInformationIfNecessary()
 		
         params.max = Math.min(max ?: 10, 100)
         [lineInstanceList: Line.list(params), lineInstanceTotal: Line.count()]
