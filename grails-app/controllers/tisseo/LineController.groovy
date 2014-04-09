@@ -17,10 +17,9 @@ class LineController {
     }
 	
 	def retrieveJSON(String apiName, String parameters) {
-		//FIX getting line one by one fail because of the date	
 			JsonSlurper jsonSlurper =  new JsonSlurper()
 			def rawText = new URL( "http://pt.data.tisseo.fr/${apiName}?format=json" + ( parameters == "" ? "" : "&" ) + "${parameters}&key=${apiKey}" ).text
-			println "http://pt.data.tisseo.fr/${apiName}?format=json" + ( parameters == "" ? "" : "&" ) + "${parameters}&key=${apiKey}"
+//			println "http://pt.data.tisseo.fr/${apiName}?format=json" + ( parameters == "" ? "" : "&" ) + "${parameters}&key=${apiKey}"
 			jsonSlurper.parseText( rawText )
 	}
 	
@@ -42,13 +41,24 @@ class LineController {
 			}
 		}
 		
-		println "json = " + json
+//		println "json = " + json
 		if ( json != null ) {
 			json = json.stopAreas.stopArea
 			json.each {
+				def stopArea = StopArea.findByStopAreaId( it.id )
+				if( stopArea == null ) {
+					stopArea = new StopArea( name: it.name,
+										 	 stopAreaId: it.id)
+//						println "J'ajoute la nouvelle stopArea ${line.shortName}"
+				} else {
+					stopArea.name = it.name
+					stopArea.stopAreaId = it.id
+//						println "Je modifie la stopArea ${line.shortName}"
+				}
+				
 				it.line.each {
 					def lineJson = retrieveJSON( "linesList", "lineId=${it.id}" )
-					println "lineJson = " + lineJson
+//					println "lineJson = " + lineJson
 					if( lineJson != null ) {
 						lineJson = lineJson.lines.line[0]
 						def line = Line.findByLineId( it.id )
@@ -68,18 +78,8 @@ class LineController {
 	//						println "Je modifie la ligne ${line.shortName}"
 						}
 						line.save()
+						stopArea.addToLines( line )
 					}
-				}
-				
-				def stopArea = StopArea.findByStopAreaId( it.id )
-				if( stopArea == null ) {
-					stopArea = new StopArea( name: it.name,
-										 	 stopAreaId: it.id)
-//						println "J'ajoute la nouvelle stopArea ${line.shortName}"
-				} else {
-					stopArea.name = it.name
-					stopArea.stopAreaId = it.id
-//						println "Je modifie la stopArea ${line.shortName}"
 				}
 				stopArea.save()
 			}
@@ -87,18 +87,81 @@ class LineController {
 	}
 	
 	def updateStopPointsApi() {
-		def json = retrieveJSON( "stopPointsList", "displayLines=1&bbox=${bbox}" )
+		def apiNameStopArea = "stopPointsList"
+		def json = null
+		def alreadyRetrieved = ExpirationDates.findByApiName( apiNameStopArea ) != null
+		if( !alreadyRetrieved || ExpirationDates.findByApiName( apiNameStopArea ).expirationDate < new Date() ) {
+		
+			json = retrieveJSON( apiNameStopArea, "displayLines=1&bbox=${bbox}" )
+			
+			def extractedDate = new SimpleDateFormat("yyyy-MM-dd h:m").parse( json.expirationDate )
+			if( alreadyRetrieved ) {
+				def newDate = ExpirationDates.findByApiName( apiNameStopArea )
+				newDate.expirationDate = extractedDate
+				newDate.save()
+			} else {
+				new ExpirationDates( apiName: apiNameStopArea, expirationDate: extractedDate ).save()
+			}
+		}
+		
+		if( json != null ) {
+			json = json.physicalStops.physicalStop
+			json.each {
+				def stopPoint = StopPoint.findByStopPointId( it.id )
+				if ( stopPoint == null ) {
+					stopPoint = new StopPoint()
+				}
+				stopPoint.name = it.name
+				stopPoint.stopPointId = it.id
+				stopPoint.nextBus = new Date()
+				it.destinations.each {
+					def destination = Destination.findByDestinationId( it.id )
+					if( destination == null ) {
+						destination = new Destination()
+					}
+					destination.name = it.name
+					destination.destinationId = it.id
+					it.line.each {
+						println "Line : " + Line.findByLineId( it.id )
+						destination.addToTerminusOf( Line.findByLineId( it.id ) )
+						stopPoint.addToOnLines( Line.findByLineId( it.id ) )
+					}
+					destination.save()
+					stopPoint.addToDestinations( destination )
+				}
+				stopPoint.stopArea = StopArea.findByStopAreaId( it.stopArea.id )
+				stopPoint.save()
+			}
+		}
 	}
 	
 	def updateApiInformationIfNecessary() {
 		updateStopAreasAndLineApi()
 		updateStopPointsApi()
 	}
+	
+	def updateNextBus( Line line ) {
+		def stopPoints = StopPoint.createCriteria().listDistinct {
+			onLines {
+				eq( "lineId", line.lineId )
+			}
+		}
+		stopPoints.each {
+			def json = retrieveJSON( "departureBoard", "stopPointId=${it.stopPointId}&lineId=${line.lineId}&number=1" )
+			if ( json != null ) {
+				json = json.departures.departure[0]
+				it.nextBus = new SimpleDateFormat("yyyy-MM-dd h:m").parse( json.dateTime )
+				it.save()
+			}
+		}
+		
+		stopPoints
+	}
 
     def list(Integer max) {
 		updateApiInformationIfNecessary()
 		
-        params.max = Math.min(max ?: 10, 100)
+        params.max = Math.min(max ?: 100, 100)
         [lineInstanceList: Line.list(params), lineInstanceTotal: Line.count()]
     }
 
@@ -124,8 +187,14 @@ class LineController {
             redirect(action: "list")
             return
         }
+		def stopPoints = updateNextBus( lineInstance )
+		if(!stopPoints) {
+            flash.message = message(code: 'default.not.found.message', args: [message(code: 'stopPoint.label', default: 'StopPoint'), id])
+            redirect(action: "list")
+            return
+		}
 
-        [lineInstance: lineInstance]
+        [lineInstance: lineInstance, stopPoints: stopPoints]
     }
 
     def edit(Long id) {

@@ -12,29 +12,25 @@
 		<div class="nav" role="navigation">
 			<ul>
 				<li><a class="home" href="${createLink(uri: '/')}"><g:message code="default.home.label"/></a></li>
-				<li><g:link class="create" action="create"><g:message code="default.new.label" args="[entityName]" /></g:link></li>
 			</ul>
 		</div>
 		<div id="list-line" class="content scaffold-list" role="main">
-			<h1><g:message code="default.list.label" args="[entityName]" /></h1>
+			<h1>Lignes de bus<!-- <g:message code="default.list.label" args="[entityName]" /> --></h1>
 			<g:if test="${flash.message}">
 			<div class="message" role="status">${flash.message}</div>
 			</g:if>
 			<table>
-				<!--  <thead>
+				<thead>
 					<tr>
 						<g:sortableColumn property="name" title="${message(code: 'line.name.label', default: 'Name')}" />
 					
 						<g:sortableColumn property="shortName" title="${message(code: 'line.shortName.label', default: 'Short Name')}" />
 						
-						<g:sortableColumn property="transportMode" title="${message(code: 'line.transportMode.label', default: 'Transport Mode')}" />
+						<g:sortableColumn property="transportMode" title="${message(code: 'line.votes.label', default: 'Votes')}" />
 					
 					</tr>
-				</thead> -->
+				</thead>
 				<tbody>
-					<tr>
-						<td><b>Bus</b></td>
-					</tr>
 				<g:each in="${Line.findAllByTransportMode( "bus" )}" status="i" var="lineInstance">
 					<tr class="${(i % 2) == 0 ? 'even' : 'odd'}">
 					

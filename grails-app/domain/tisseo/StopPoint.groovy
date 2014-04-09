@@ -5,9 +5,15 @@ class StopPoint {
 	String name
 	String stopPointId
 	
-	static hasMany = [destinations: Destination]
+	Date nextBus
+	
+	static hasMany = [destinations: Destination, onLines: Line]
 	static belongsTo = [stopArea: StopArea]
 	
     static constraints = {
     }
+	
+	String toString() {
+		name + " : " + stopPointId
+	}
 }
