@@ -19,7 +19,6 @@ class LineController {
 	def retrieveJSON(String apiName, String parameters) {
 			JsonSlurper jsonSlurper =  new JsonSlurper()
 			def rawText = new URL( "http://pt.data.tisseo.fr/${apiName}?format=json" + ( parameters == "" ? "" : "&" ) + "${parameters}&key=${apiKey}" ).text
-//			println "http://pt.data.tisseo.fr/${apiName}?format=json" + ( parameters == "" ? "" : "&" ) + "${parameters}&key=${apiKey}"
 			jsonSlurper.parseText( rawText )
 	}
 	
@@ -41,7 +40,6 @@ class LineController {
 			}
 		}
 		
-//		println "json = " + json
 		if ( json != null ) {
 			json = json.stopAreas.stopArea
 			json.each {
@@ -49,16 +47,13 @@ class LineController {
 				if( stopArea == null ) {
 					stopArea = new StopArea( name: it.name,
 										 	 stopAreaId: it.id)
-//						println "J'ajoute la nouvelle stopArea ${line.shortName}"
 				} else {
 					stopArea.name = it.name
 					stopArea.stopAreaId = it.id
-//						println "Je modifie la stopArea ${line.shortName}"
 				}
 				
 				it.line.each {
 					def lineJson = retrieveJSON( "linesList", "lineId=${it.id}" )
-//					println "lineJson = " + lineJson
 					if( lineJson != null ) {
 						lineJson = lineJson.lines.line[0]
 						def line = Line.findByLineId( it.id )
@@ -69,13 +64,11 @@ class LineController {
 											 transportMode: lineJson.transportMode?.name,
 											 likesCount: 0,
 											 dislikesCount: 0 )
-	//						println "J'ajoute la nouvelle ligne ${line.shortName}"
 						} else {
 							line.name = lineJson.name
 							line.shortName = lineJson.shortName
 							line.lineId = lineJson.id
 							line.transportMode = lineJson.transportMode?.name
-	//						println "Je modifie la ligne ${line.shortName}"
 						}
 						line.save()
 						stopArea.addToLines( line )
@@ -122,7 +115,6 @@ class LineController {
 					destination.name = it.name
 					destination.destinationId = it.id
 					it.line.each {
-						println "Line : " + Line.findByLineId( it.id )
 						destination.addToTerminusOf( Line.findByLineId( it.id ) )
 						stopPoint.addToOnLines( Line.findByLineId( it.id ) )
 					}
@@ -165,21 +157,6 @@ class LineController {
         [lineInstanceList: Line.list(params), lineInstanceTotal: Line.count()]
     }
 
-    def create() {
-		[lineInstance: new Line(params)]
-    }
-
-    def save() {
-        def lineInstance = new Line(params)
-        if (!lineInstance.save(flush: true)) {
-            render(view: "create", model: [lineInstance: lineInstance])
-            return
-        }
-
-        flash.message = message(code: 'default.created.message', args: [message(code: 'line.label', default: 'Line'), lineInstance.lineId])
-        redirect(action: "show", id: lineInstance.lineId)
-    }
-
     def show(Long id) {
         def lineInstance = Line.get(id)
         if (!lineInstance) {
@@ -195,65 +172,6 @@ class LineController {
 		}
 
         [lineInstance: lineInstance, stopPoints: stopPoints]
-    }
-
-    def edit(Long id) {
-        def lineInstance = Line.get(id)
-        if (!lineInstance) {
-            flash.message = message(code: 'default.not.found.message', args: [message(code: 'line.label', default: 'Line'), id])
-            redirect(action: "list")
-            return
-        }
-
-        [lineInstance: lineInstance]
-    }
-
-    def update(Long id, Long version) {
-        def lineInstance = Line.get(id)
-        if (!lineInstance) {
-            flash.message = message(code: 'default.not.found.message', args: [message(code: 'line.label', default: 'Line'), id])
-            redirect(action: "list")
-            return
-        }
-
-        if (version != null) {
-            if (lineInstance.version > version) {
-                lineInstance.errors.rejectValue("version", "default.optimistic.locking.failure",
-                          [message(code: 'line.label', default: 'Line')] as Object[],
-                          "Another user has updated this Line while you were editing")
-                render(view: "edit", model: [lineInstance: lineInstance])
-                return
-            }
-        }
-
-        lineInstance.properties = params
-
-        if (!lineInstance.save(flush: true)) {
-            render(view: "edit", model: [lineInstance: lineInstance])
-            return
-        }
-
-        flash.message = message(code: 'default.updated.message', args: [message(code: 'line.label', default: 'Line'), lineInstance.lineId])
-        redirect(action: "show", id: lineInstance.lineId)
-    }
-
-    def delete(Long id) {
-        def lineInstance = Line.get(id)
-        if (!lineInstance) {
-            flash.message = message(code: 'default.not.found.message', args: [message(code: 'line.label', default: 'Line'), id])
-            redirect(action: "list")
-            return
-        }
-
-        try {
-            lineInstance.delete(flush: true)
-            flash.message = message(code: 'default.deleted.message', args: [message(code: 'line.label', default: 'Line'), id])
-            redirect(action: "list")
-        }
-        catch (DataIntegrityViolationException e) {
-            flash.message = message(code: 'default.not.deleted.message', args: [message(code: 'line.label', default: 'Line'), id])
-            redirect(action: "show", id: id)
-        }
     }
 	
 	def like(Long id) {

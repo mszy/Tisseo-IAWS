@@ -10,9 +10,11 @@
 	<body>
 		<a href="#list-line" class="skip" tabindex="-1"><g:message code="default.link.skip.label" default="Skip to content&hellip;"/></a>
 		<div class="nav" role="navigation">
+		<!--  
 			<ul>
 				<li><a class="home" href="${createLink(uri: '/')}"><g:message code="default.home.label"/></a></li>
 			</ul>
+		-->
 		</div>
 		<div id="list-line" class="content scaffold-list" role="main">
 			<h1>Lignes de bus<!-- <g:message code="default.list.label" args="[entityName]" /> --></h1>
